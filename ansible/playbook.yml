@@ -1,0 +1,55 @@
+---
+- name: Install and configure nginx on EC2 instances
+  hosts: web_servers
+  become: true
+
+  vars:
+    s3_bucket: "{{ lookup('env', 'S3_BUCKET') }}"
+    server_name: "{{ ansible_host }}"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install nginx and dependencies
+      apt:
+        name:
+          - nginx
+          - unzip
+          - curl
+        state: present
+
+    - name: Install AWS CLI
+      shell: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+        unzip -o /tmp/awscliv2.zip -d /tmp
+        /tmp/aws/install --update
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Deploy nginx config from template
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/default
+        backup: true
+      notify: Reload nginx
+
+    - name: Sync static content from S3
+      shell: >
+        /usr/local/bin/aws s3 sync s3://{{ s3_bucket }}/html /var/www/html
+        --region eu-central-1
+      when: s3_bucket != ""
+
+    - name: Enable and start nginx
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded

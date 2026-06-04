@@ -1,0 +1,14 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+crash.log
+
+# AWS credentials
+.aws/
+
+# OS
+.DS_Store
+Thumbs.db
