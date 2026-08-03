@@ -40,21 +40,23 @@ A 3-tier AWS infrastructure — networking, compute, and storage — provisioned
 ## What Terraform Provisions
 
 - **VPC** with 9 subnets across 3 Availability Zones:
-  - 3 **frontend** subnets (public) → routed to Internet Gateway, host the ALB
-  - 3 **backend** subnets (private) → routed to a NAT Gateway for outbound-only access, host the EC2 instances
-  - 3 **database** subnets (isolated) → no route out (blackhole route table); reserved for a future database tier, no DB resource currently deployed
-- **3 EC2 instances** (Ubuntu 22.04 LTS, `t3.micro`), one per AZ, placed in the private backend subnets — not directly internet-facing
+  - 3 frontend subnets (public) → routed to Internet Gateway, host the ALB
+  - 3 backend subnets (private) → routed to a NAT Gateway for outbound-only access, host the EC2 instances
+  - 3 database subnets (isolated) → no route out (blackhole route table); reserved for a future database tier, no DB resource currently deployed
+- **3 EC2 instances** (Ubuntu 22.04 LTS, t3.micro), one per AZ, placed in the private backend subnets — not directly internet-facing
 - **Application Load Balancer** (internet-facing, port 80) distributing traffic to the EC2 instances via a target group with health checks
 - **S3 bucket** (public access blocked) for static content, synced to each instance
 - **IAM role + instance profile** granting the EC2 instances read-only access to the S3 bucket
 - **Security groups**: the ALB accepts HTTP/HTTPS from the internet; the EC2 instances accept HTTP only from the ALB's security group (not from the internet directly)
+
+Terraform is organized into logical files: [`network.tf`](network.tf), [`security.tf`](security.tf), [`storage.tf`](storage.tf), [`compute.tf`](compute.tf), [`loadbalancer.tf`](loadbalancer.tf), [`providers.tf`](providers.tf), [`variables.tf`](variables.tf).
 
 ## Configuration Management
 
 Two complementary layers handle the web server setup:
 
 - **Terraform `user_data`** bootstraps each instance on first boot: installs nginx and the AWS CLI, writes a placeholder page, and does an initial sync from the S3 bucket.
-- **Ansible** (`ansible/playbook.yml`) handles repeatable, idempotent configuration after provisioning — install nginx/AWS CLI, deploy an nginx config from a Jinja2 template (`templates/nginx.conf.j2`), re-sync content from S3, and reload nginx via a handler. This is the layer used to make configuration changes without having to replace or restart instances.
+- **Ansible** ([`ansible/playbook.yml`](ansible/playbook.yml)) handles repeatable, idempotent configuration after provisioning — install nginx/AWS CLI, deploy an nginx config from a Jinja2 template ([`templates/nginx.conf.j2`](ansible/templates/nginx.conf.j2)), re-sync content from S3, and reload nginx via a handler. This is the layer used to make configuration changes without having to replace or restart instances.
 
 ## Tech Stack
 
@@ -88,7 +90,7 @@ terraform destroy
 
 ## Configuration
 
-Key variables (see `variables.tf`, override in a `terraform.tfvars` — not committed):
+Key variables (see [`variables.tf`](variables.tf), override in a `terraform.tfvars` — not committed):
 
 | Variable | Default | Description |
 |---|---|---|
@@ -107,10 +109,12 @@ Key variables (see `variables.tf`, override in a `terraform.tfvars` — not comm
 
 This project uses manual deployment (`terraform apply` + `ansible-playbook`, run locally) rather than a CI/CD pipeline — unlike the companion [gs-rest-service](https://github.com/kenze-p/gs-rest-service) project, which is fully automated via GitHub Actions.
 
-## Project Status
-
-Built as a hands-on technical assessment to demonstrate 3-tier network design and infrastructure-as-code practices. The AWS infrastructure has since been decommissioned to avoid ongoing costs; the screenshots below were captured while it was running. The Terraform and Ansible code remain fully intact and reproducible.
-
 ## Screenshots
 
-See the `screenshots/` folder for captures of the running VPC, EC2 instances, and Application Load Balancer (healthy target group) taken while the infrastructure was live.
+See the [`screenshots/`](screenshots/) folder for captures of the running VPC, EC2 instances, and Application Load Balancer (healthy target group) taken while the infrastructure was live.
+
+> Note: confirm this folder actually contains images before sharing the repo — if it's empty, either add the captures or remove this section.
+
+## Project Status
+
+Built as a hands-on technical assessment to demonstrate 3-tier network design and infrastructure-as-code practices. The AWS infrastructure has since been decommissioned to avoid ongoing costs; the screenshots above were captured while it was running. The Terraform and Ansible code remain fully intact and reproducible.
